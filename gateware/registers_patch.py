@@ -15,6 +15,8 @@
 from types import MethodType
 from tabulate import tabulate
 
+from nmigen import *
+
 def apply(obj):
     obj.append = MethodType(append, obj)
     obj.elaborate = MethodType(elaborate, obj)
