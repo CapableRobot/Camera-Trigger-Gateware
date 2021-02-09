@@ -32,7 +32,7 @@ Trigger Mask       0x14           1  0          False
 
 ### Toolchain Installation
 
-Install project [IceStorm toolchain](http://www.clifford.at/icestorm/).  Note that the Arachne-PNR tool is not used, NextPNR is the place-and-route tool.
+Install the [open-source FPGA toolchain](https://github.com/YosysHQ/fpga-toolchain).  
 
 Then install [nmigen](https://github.com/nmigen/nmigen) and [tabulate](https://github.com/astanin/python-tabulate) via PIP:
 
