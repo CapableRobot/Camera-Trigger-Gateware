@@ -1,12 +1,10 @@
-from nmigen import *
-from nmigen.lib.io import Pin
-from nmigen.compat.fhdl.specials import TSTriple
+from migen import *
 
 
 __all__ = ['Pads']
 
 
-class Pads(Elaboratable):
+class Pads(Module):
     """
     Pad adapter.
 
@@ -44,7 +42,6 @@ class Pads(Elaboratable):
     triples when slicing, the results of slicing are unchanged.
     """
     def __init__(self, *args, **kwargs):
-        self._tristates = []
         for (i, elem) in enumerate(args):
             self._add_elem(elem, index=i)
         for name, elem in kwargs.items():
@@ -63,13 +60,12 @@ class Pads(Elaboratable):
             return
         elif isinstance(elem, Signal):
             triple = TSTriple()
-            self._tristates.append(triple.get_tristate(elem))
+            self.specials += triple.get_tristate(elem)
+
             if name is None:
-                name = elem.name
-        elif isinstance(elem, (Pin, TSTriple)):
+                name = elem.backtrace[-1][0]
+        elif isinstance(elem, TSTriple):
             triple = elem
-        else:
-            assert False
 
         if name is None and index is None:
             raise ValueError("Name must be provided for {!r}".format(elem))
@@ -83,14 +79,10 @@ class Pads(Elaboratable):
 
         setattr(self, triple_name, triple)
 
-    def elaborate(self, platform):
-        m = Module()
-        m.submodules += self._tristates
-        return m
-
 # -------------------------------------------------------------------------------------------------
 
 import unittest
+from migen.fhdl.specials import Tristate
 
 
 class PadsTestCase(unittest.TestCase):
@@ -98,8 +90,8 @@ class PadsTestCase(unittest.TestCase):
         self.assertIsInstance(obj, TSTriple)
 
     def assertHasTristate(self, frag, sig):
-        for tristate in frag._tristates:
-            if tristate.target is sig:
+        for special in frag.specials:
+            if isinstance(special, Tristate) and special.target == sig:
                 return
         self.fail("No tristate for {!r} in {!r}".format(sig, frag))
 
@@ -111,20 +103,23 @@ class PadsTestCase(unittest.TestCase):
     def test_signal(self):
         sig  = Signal()
         pads = Pads(sig)
+        frag = pads.get_fragment()
 
         self.assertIsTriple(pads.sig_t)
-        self.assertHasTristate(pads, sig)
+        self.assertHasTristate(frag, sig)
 
     def test_signal_named(self):
         sig  = Signal()
         pads = Pads(rx=sig)
+        frag = pads.get_fragment()
 
         self.assertIsTriple(pads.rx_t)
-        self.assertHasTristate(pads, sig)
+        self.assertHasTristate(frag, sig)
 
     def test_triple(self):
         tri  = TSTriple()
         pads = Pads(sig=tri)
+        frag = pads.get_fragment()
 
         self.assertIsTriple(pads.sig_t)
         self.assertEqual(pads.sig_t, tri)
@@ -136,17 +131,19 @@ class PadsTestCase(unittest.TestCase):
     def test_record(self):
         rec  = Record([("rx", 1), ("tx", 1)])
         pads = Pads(rec)
+        frag = pads.get_fragment()
 
         self.assertIsTriple(pads.rx_t)
-        self.assertHasTristate(pads, rec.rx)
+        self.assertHasTristate(frag, rec.rx)
         self.assertIsTriple(pads.tx_t)
-        self.assertHasTristate(pads, rec.tx)
+        self.assertHasTristate(frag, rec.tx)
 
     def test_record_named(self):
         rec  = Record([("rx", 1), ("tx", 1)])
         pads = Pads(uart=rec)
+        frag = pads.get_fragment()
 
         self.assertIsTriple(pads.uart_rx_t)
-        self.assertHasTristate(pads, rec.rx)
+        self.assertHasTristate(frag, rec.rx)
         self.assertIsTriple(pads.uart_tx_t)
-        self.assertHasTristate(pads, rec.tx)
+        self.assertHasTristate(frag, rec.tx)

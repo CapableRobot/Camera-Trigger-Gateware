@@ -15,11 +15,10 @@
 from types import MethodType
 from tabulate import tabulate
 
-from nmigen import *
+from migen import *
 
 def apply(obj):
-    obj.append = MethodType(append, obj)
-    obj.elaborate = MethodType(elaborate, obj)
+    obj.create = MethodType(create, obj)
     obj.display_table = MethodType(display_table, obj)
     obj.display_defines = MethodType(display_defines, obj)
     
@@ -28,11 +27,7 @@ def apply(obj):
 def _hex(value):
     return "0x" + format(value, '02X')
 
-def elaborate(self, platform):
-        m = Module()
-        return m
-
-def append(self, m, name, length=1, default=0, ro=False, desc=''):
+def create(self, name, length=1, default=0, ro=False, desc=''):
     if not hasattr(self, 'registers'):
         self.registers = []
 
@@ -52,16 +47,18 @@ def append(self, m, name, length=1, default=0, ro=False, desc=''):
     if ro:
         if length == 1:
             reg, addr  = self.add_ro(8)
-            m.d.comb += [reg.eq(default)]
+            self.comb += [reg.eq(default)]
 
         else:
             for idx in range(length):
-                r, a = self.add_ro(8)
+                value = 0
+                if default != 0:
+                    value = ord(default[idx])
+
+                r, a = self.add_ro(8, reset=value)
                 reg.append(r)
                 addr.append(a)
 
-                if default != 0:
-                    m.d.comb += [r.eq(ord(default[idx]))]
     else:
         if length == 1:
             reg, addr = self.add_rw(8)

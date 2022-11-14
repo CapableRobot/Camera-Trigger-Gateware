@@ -1,53 +1,36 @@
-from nmigen import *
+from migen import *
 
-class IdentRegisters(Elaboratable):
+class IdentRegisters(Module):
 
     def __init__(self, registers, name, hardware_rev, gateware_rev, reserved=16):
-        self._registers = registers
         self.name = name
         self.hardware_rev = hardware_rev
         self.gateware_rev = gateware_rev
         self.reserved = reserved
 
-    def elaborate(self, platform):
-        m = Module()
+        registers.create("Product ID", len(self.name), default=self.name, ro=True)
+        registers.create("Hardware Revision", 1, default=self.hardware_rev, ro=True)
+        registers.create("Gateware Revision", 1, default=self.gateware_rev, ro=True)
+        registers.create("Reserved", self.reserved-len(self.name)-2, default=0, ro=True)
 
-        self._registers.append(m, "Product ID", len(self.name), default=self.name, ro=True)
-        self._registers.append(m, "Hardware Revision", 1, default=self.hardware_rev, ro=True)
-        self._registers.append(m, "Gateware Revision", 1, default=self.gateware_rev, ro=True)
-        self._registers.append(m, "Reserved", self.reserved-len(self.name)-2, default=0, ro=True)
-
-        return m
-
-
-class ClockDivider(Elaboratable):
+class ClockDivider(Module):
     def __init__(self, maxperiod):
-        self.maxperiod = maxperiod
-
-        self.counter = Signal(range(maxperiod))
-        self.period  = Signal(range(maxperiod))
+        counter = Signal(max=maxperiod)
+        period  = Signal(max=maxperiod)
 
         self.clock = Signal()
         self.strobe = Signal()
 
-    def elaborate(self, platform):
-        m = Module()
+        self.comb += period.eq(maxperiod-1)
 
-        m.d.comb += self.period.eq(self.maxperiod-1)
-
-        with m.If(self.counter == 0):
-            m.d.sync += [
-                self.clock.eq(~self.clock),
-                self.strobe.eq(1),
-                self.counter.eq(self.period)
-            ]
-        with m.Else():
-            m.d.sync += [
-                self.strobe.eq(0),
-                self.counter.eq(self.counter - 1)
-            ]
-
-        return m
+        self.sync += If(counter == 0,
+                            self.clock.eq(~self.clock),
+                            self.strobe.eq(1),
+                            counter.eq(period),
+                        ).Else(
+                            self.strobe.eq(0),
+                            counter.eq(counter - 1),
+                        )
 
 TRIG_MODE = dict(
     stop = 0x00,
@@ -57,126 +40,111 @@ TRIG_MODE = dict(
     constant = 0x04
 )
 
-class Trigger(Elaboratable):
+class Trigger(Module):
 
     def __init__(self, strobe, width):
-        self.strobe = strobe
-        self.width = width
-
+    
         self.trigger  = Signal()
-        self.mode     = Signal(width, reset=TRIG_MODE['idle'])
+        self.mode     = Signal(width)
         self.interval = Signal(width)
         self.duration = Signal(width)
 
-    def elaborate(self, platform):
-        m = Module()
+        interval_counter = Signal(width)
+        duration_counter = Signal(width)
         
-        interval_counter = Signal(self.width)
-        duration_counter = Signal(self.width)
-
-        with m.If(self.strobe):
-            with m.Switch(self.mode):
+        self.sync += If(strobe,
+            Case(self.mode, {
                 ## Make sure trigger is stopped (it might already be low)
-                with m.Case(TRIG_MODE['stop']): 
-                    m.d.sync += self.trigger.eq(0)
+                TRIG_MODE['stop']: [self.trigger.eq(0)],
 
                 ## Return state after a one-shot trigger
-                with m.Case(TRIG_MODE['idle']): 
-                    m.d.sync += self.trigger.eq(self.trigger)
+                TRIG_MODE['idle']: [self.trigger.eq(self.trigger)],
 
                 ## Make sure we have a value (non zero) duration & interval before continuing
                 ## They are set outside of this module, and may not be set on the first clock edge
-                with m.Case(TRIG_MODE['interval']): 
-                    with m.If((self.duration != 0) & (self.interval != 0)):
-                        with m.If(interval_counter == 0):
-                            m.d.sync += [
+                TRIG_MODE['interval']: [
+                    If(self.duration != 0,
+                        If(self.interval != 0, 
+                            If(interval_counter == 0,
                                 duration_counter.eq(self.duration-1),   # Setup the trigger duration
                                 self.trigger.eq(1),                     # Start the trigger
-                                interval_counter.eq(self.interval-1)    # Reset the trigger interval
-                            ]
-                        with m.Else():
-                            m.d.sync += interval_counter.eq(interval_counter - 1)
+                                interval_counter.eq(self.interval-1),   # Reset the trigger interval
+                            ).Else(
+                                interval_counter.eq(interval_counter - 1),
+                            )
+                        )
+                    )
+                ],
 
-                with m.Case(TRIG_MODE['oneshot']): 
-                    with m.If(self.duration != 0): 
-                        m.d.sync += [
-                            duration_counter.eq(self.duration-1),   # Setup the trigger duration
-                            self.trigger.eq(1)                      # Start the trigger 
-                        ]
-                
-                with m.Case(TRIG_MODE['constant']):
-                    m.d.sync += self.trigger.eq(1)
+                TRIG_MODE['oneshot']: [
+                    If(self.duration != 0, 
+                        duration_counter.eq(self.duration-1),   # Setup the trigger duration
+                        self.trigger.eq(1),                     # Start the trigger 
+                    )
+                ],
 
-            
-            # Skip if in constant trigger mode (where trigger duration is ignored)
-            with m.If((self.trigger == 1) & (self.mode != TRIG_MODE['constant'])):
-                with m.If(duration_counter == 0):
-                    # Stop the trigger 
-                    m.d.sync += self.trigger.eq(0)                  
-                with m.Else():
-                    # Keep the trigger going
-                    m.d.sync += duration_counter.eq(duration_counter - 1)   
-            
-        return m
+                TRIG_MODE['constant']: [self.trigger.eq(1)]
 
-class ResetController(Elaboratable):
+            }).makedefault(TRIG_MODE['idle']),
+
+            If(self.trigger == 1,
+                # Skip if in constant trigger mode (where trigger duration is ignored)
+                If(self.mode != TRIG_MODE['constant'],                 
+                    If(duration_counter == 0,                       
+                        self.trigger.eq(0)                          # Stop the trigger 
+                    ).Else(                             
+                        duration_counter.eq(duration_counter - 1)   # Keep the trigger going
+                    )
+                )
+            )
+        )
+
+class ResetController(Module):
 
     def __init__(self, registers, reset_pins):
         assert len(reset_pins) == 8
-        self.reset_pins = reset_pins
-        self._registers = registers
+        register, _ = registers.create("Reset")
 
-    def elaborate(self, platform):
-        m = Module()
+        for i in range(len(reset_pins)):
+            self.comb  += reset_pins[i].eq(register[i])
 
-        reg, _ = self._registers.append(m, "Reset Mask")
-
-        for i in range(len(self.reset_pins)):
-            m.d.comb += self.reset_pins[i].eq(reg[i])
-
-        return m
-
-class TriggerController(Elaboratable):
+class TriggerController(Module):
 
     def __init__(self, registers, strobe, width, trigger_pins):
-        self._registers = registers
-
-        self.strobe = strobe
-        self.width = width
-        self.trigger_pins = trigger_pins
+        self.submodules.trigger = Trigger(strobe, width)
 
         self.modes = TRIG_MODE
 
-    def elaborate(self, platform):
-        m = Module()
+        ## TODO : support register widths != 8 bits
+        reg_mode, _     = registers.create("Trigger Mode")
+        reg_interval, _ = registers.create("Trigger Interval")
+        reg_duration, _ = registers.create("Trigger Duration")
+        reg_mask, _     = registers.create("Trigger Mask")
 
-        trigger = Trigger(self.strobe, self.width)
-        m.submodules.trigger = trigger
-
-        reg_mode, _     = self._registers.append(m, "Trigger Mode")
-        reg_interval, _ = self._registers.append(m, "Trigger Interval")
-        reg_duration, _ = self._registers.append(m, "Trigger Duration")
-        reg_mask, _     = self._registers.append(m, "Trigger Mask")
-
-
-        m.d.comb += [
-            trigger.mode.eq(reg_mode),
-            trigger.interval.eq(reg_interval),
-            trigger.duration.eq(reg_duration),
+        self.comb += [
+            self.trigger.mode.eq(reg_mode),
+            self.trigger.interval.eq(reg_interval),
+            self.trigger.duration.eq(reg_duration),
         ]
 
-        with m.If(self.strobe):
+        self.sync += [
+            If(strobe,
                 ## We've started the trigger, can now return to IDLE mode
-                with m.If((reg_mode == TRIG_MODE['oneshot']) & (trigger.trigger == 1)):
-                    m.d.sync += reg_mode.eq(TRIG_MODE['idle']) 
-            
-        with m.Else():
-                ## We've IDLE and trigger has stopped, go to STOP
-                with m.If((reg_mode == TRIG_MODE['idle']) & (trigger.trigger == 0)):
-                    m.d.sync += reg_mode.eq(TRIG_MODE['stop'])
-            
-        ## Apply mask between internal trigger signal and hardware pins
-        for i in range(len(self.trigger_pins)):
-            m.d.comb  += self.trigger_pins[i].eq(reg_mask[i] & trigger.trigger)
+                If(reg_mode == TRIG_MODE['oneshot'],
+                    If(self.trigger.trigger == 1,
+                        reg_mode.eq(TRIG_MODE['idle']) 
+                    )
+                ),
+                ## We're IDLE and trigger has stopped, go to STOP
+                If(reg_mode == TRIG_MODE['idle'],
+                    If(self.trigger.trigger == 0,
+                        reg_mode.eq(TRIG_MODE['stop'])
+                    )
+                )
+            )
+        ]
 
-        return m
+        ## Apply mask between internal trigger signal and hardware pins
+        for i in range(len(trigger_pins)):
+            self.comb  += trigger_pins[i].eq(reg_mask[i] & self.trigger.trigger)
+            

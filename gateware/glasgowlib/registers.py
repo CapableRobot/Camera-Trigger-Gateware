@@ -1,4 +1,4 @@
-from nmigen.compat import *
+from migen import *
 
 
 __all__ = ["Registers", "I2CRegisters"]
@@ -17,7 +17,7 @@ class Registers(Module):
         self.regs_w = Array()
 
     def _add_reg(self, *args, **kwargs):
-        reg  = Signal(*args, **kwargs, src_loc_at=2)
+        reg  = Signal(*args, **kwargs)
         addr = self.reg_count
         self.reg_count += 1
         return reg, addr
