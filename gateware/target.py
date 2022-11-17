@@ -42,7 +42,7 @@ class TriggerTarget(Module):
             self.submodules.wall = ClockDivider(5)
 
             self.enable = Signal()
-            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, self.enable, 8)
+            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, self.enable)
 
         else:
             self.submodules.i2c_pads  = Pads(self.platform.request("i2c"))
@@ -65,11 +65,13 @@ class TriggerTarget(Module):
 
             self.submodules.ident      = IdentRegisters(self.registers, self.product_id, self.hardware_revision, self.gateware_revision)
 
+            reg_wall, _     = self.registers.create("Clock Dividder", default=100)
+
             reg_globals, _  = self.registers.create("Trigger Globals")
             enable = reg_globals[0]
 
-            self.submodules.triggerA  = TriggerController(0, self.registers, self.wall.strobe, enable, 8)
-            self.submodules.triggerB  = TriggerController(1, self.registers, self.wall.strobe, enable, 8)
+            self.submodules.triggerA  = TriggerController(0, self.registers, self.wall.strobe, enable)
+            self.submodules.triggerB  = TriggerController(1, self.registers, self.wall.strobe, enable)
 
             inputs = Array([self.triggerA.output, self.triggerB.output])
             

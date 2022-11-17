@@ -49,7 +49,7 @@ TRIG_STATE = dict(
 
 class Trigger(Module):
 
-    def __init__(self, strobe, enable, width):
+    def __init__(self, strobe, enable, width=8):
     
         self.trigger  = Signal()
         self.mode     = Signal(width)
@@ -166,8 +166,8 @@ class Trigger(Module):
 
 class TriggerController(Module):
 
-    def __init__(self, idx, registers, strobe, enable, width):
-        self.submodules.trigger = Trigger(strobe, enable, width)
+    def __init__(self, idx, registers, strobe, enable):
+        self.submodules.trigger = Trigger(strobe, enable)
 
         self.modes = TRIG_MODE
 
