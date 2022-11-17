@@ -49,7 +49,7 @@ TRIG_STATE = dict(
 
 class Trigger(Module):
 
-    def __init__(self, strobe, width):
+    def __init__(self, strobe, enable, width):
     
         self.trigger  = Signal()
         self.mode     = Signal(width)
@@ -65,49 +65,56 @@ class Trigger(Module):
 
         return_mode = Signal(width)
         
-        self.sync += If(strobe,
-            Case(self.mode, {
-                ## Make sure trigger is stopped (it might already be low)
-                TRIG_MODE['stop']: [
-                    self.trigger.eq(0),
-                    trigger_state.eq(TRIG_STATE['off'])
-                ],
+        self.sync += If(enable,
+            If(strobe,
+                Case(self.mode, {
+                    ## Make sure trigger is stopped (it might already be low)
+                    TRIG_MODE['stop']: [
+                        self.trigger.eq(0),
+                        trigger_state.eq(TRIG_STATE['off'])
+                    ],
 
-                ## Return state after a one-shot trigger
-                TRIG_MODE['idle']: [self.trigger.eq(self.trigger)],
+                    ## Return state after a one-shot trigger
+                    TRIG_MODE['idle']: [self.trigger.eq(self.trigger)],
 
-                ## Make sure we have a value (non zero) duration & interval before continuing
-                ## They are set outside of this module, and may not be set on the first clock edge
-                TRIG_MODE['interval']: [
-                    If(self.duration != 0,
-                        If(self.interval != 0, 
-                            If(interval_counter == 0,
-                                duration_counter.eq(self.duration-1),   # Setup the trigger duration
-                                trigger_state.eq(TRIG_STATE['init']),   # Start the trigger
-                                interval_counter.eq(self.interval-1),   # Reset the trigger interval
-                            ).Else(
-                                interval_counter.eq(interval_counter - 1),
+                    ## Make sure we have a value (non zero) duration & interval before continuing
+                    ## They are set outside of this module, and may not be set on the first clock edge
+                    TRIG_MODE['interval']: [
+                        If(self.duration != 0,
+                            If(self.interval != 0, 
+                                If(interval_counter == 0,
+                                    duration_counter.eq(self.duration-1),   # Setup the trigger duration
+                                    trigger_state.eq(TRIG_STATE['init']),   # Start the trigger
+                                    interval_counter.eq(self.interval-1),   # Reset the trigger interval
+                                ).Else(
+                                    interval_counter.eq(interval_counter - 1),
+                                )
                             )
                         )
-                    )
-                ],
+                    ],
 
-                TRIG_MODE['oneshot']: [
-                    If(self.duration != 0, 
-                        If(trigger_state == TRIG_STATE['off'],
-                            duration_counter.eq(self.duration-1),   # Setup the trigger duration
-                            trigger_state.eq(TRIG_STATE['init']),   # Start the trigger 
+                    TRIG_MODE['oneshot']: [
+                        If(self.duration != 0, 
+                            If(trigger_state == TRIG_STATE['off'],
+                                duration_counter.eq(self.duration-1),   # Setup the trigger duration
+                                trigger_state.eq(TRIG_STATE['init']),   # Start the trigger 
+                            )
                         )
-                    )
-                ],
+                    ],
 
-                TRIG_MODE['constant']: [
-                    If(trigger_state == TRIG_STATE['off'], 
-                        trigger_state.eq(TRIG_STATE['init'])
-                    )
-                ]
+                    TRIG_MODE['constant']: [
+                        If(trigger_state == TRIG_STATE['off'], 
+                            trigger_state.eq(TRIG_STATE['init'])
+                        )
+                    ]
 
-            }).makedefault(TRIG_MODE['idle'])
+                }).makedefault(TRIG_MODE['idle'])
+            )
+        ).Else(
+            self.trigger.eq(0),
+            trigger_state.eq(TRIG_STATE['off']),
+            interval_counter.eq(0),
+            phase_counter.eq(0)
         )
 
         ## Count down the trigger duration once the trigger has been turned on
@@ -168,8 +175,8 @@ class ResetController(Module):
 
 class TriggerController(Module):
 
-    def __init__(self, registers, strobe, width):
-        self.submodules.trigger = Trigger(strobe, width)
+    def __init__(self, registers, strobe, enable, width):
+        self.submodules.trigger = Trigger(strobe, enable, width)
 
         self.modes = TRIG_MODE
 
