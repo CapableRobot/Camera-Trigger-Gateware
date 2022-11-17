@@ -175,16 +175,16 @@ class ResetController(Module):
 
 class TriggerController(Module):
 
-    def __init__(self, registers, strobe, enable, width):
+    def __init__(self, idx, registers, strobe, enable, width):
         self.submodules.trigger = Trigger(strobe, enable, width)
 
         self.modes = TRIG_MODE
 
         ## TODO : support register widths != 8 bits
-        reg_mode, _     = registers.create("Trigger Mode")
-        reg_interval, _ = registers.create("Trigger Interval")
-        reg_duration, _ = registers.create("Trigger Duration")
-        reg_phase, _    = registers.create("Trigger Phase")
+        reg_mode, _     = registers.create("Trigger{} Mode".format(idx))
+        reg_interval, _ = registers.create("Trigger{} Interval".format(idx))
+        reg_duration, _ = registers.create("Trigger{} Duration".format(idx))
+        reg_phase, _    = registers.create("Trigger{} Phase".format(idx))
 
         self.comb += [
             self.trigger.mode.eq(reg_mode),
