@@ -37,7 +37,15 @@ TRIG_MODE = dict(
     idle = 0x01,
     interval = 0x02,
     oneshot = 0x03,
-    constant = 0x04
+    constant = 0x04,
+    phasewait = 0xF0
+)
+
+TRIG_STATE = dict(
+    off = 0x00,
+    init = 0x01,
+    wait = 0x02,
+    active = 0x03
 )
 
 class Trigger(Module):
@@ -48,14 +56,23 @@ class Trigger(Module):
         self.mode     = Signal(width)
         self.interval = Signal(width)
         self.duration = Signal(width)
+        self.phase    = Signal(width)
+
+        trigger_state = Signal(max=max(TRIG_STATE.values()))
 
         interval_counter = Signal(width)
         duration_counter = Signal(width)
+        phase_counter    = Signal(width)
+
+        return_mode = Signal(width)
         
         self.sync += If(strobe,
             Case(self.mode, {
                 ## Make sure trigger is stopped (it might already be low)
-                TRIG_MODE['stop']: [self.trigger.eq(0)],
+                TRIG_MODE['stop']: [
+                    self.trigger.eq(0),
+                    trigger_state.eq(TRIG_STATE['off'])
+                ],
 
                 ## Return state after a one-shot trigger
                 TRIG_MODE['idle']: [self.trigger.eq(self.trigger)],
@@ -67,7 +84,7 @@ class Trigger(Module):
                         If(self.interval != 0, 
                             If(interval_counter == 0,
                                 duration_counter.eq(self.duration-1),   # Setup the trigger duration
-                                self.trigger.eq(1),                     # Start the trigger
+                                trigger_state.eq(TRIG_STATE['init']),   # Start the trigger
                                 interval_counter.eq(self.interval-1),   # Reset the trigger interval
                             ).Else(
                                 interval_counter.eq(interval_counter - 1),
@@ -78,23 +95,58 @@ class Trigger(Module):
 
                 TRIG_MODE['oneshot']: [
                     If(self.duration != 0, 
-                        duration_counter.eq(self.duration-1),   # Setup the trigger duration
-                        self.trigger.eq(1),                     # Start the trigger 
+                        If(trigger_state == TRIG_STATE['off'],
+                            duration_counter.eq(self.duration-1),   # Setup the trigger duration
+                            trigger_state.eq(TRIG_STATE['init']),   # Start the trigger 
+                        )
                     )
                 ],
 
-                TRIG_MODE['constant']: [self.trigger.eq(1)]
+                TRIG_MODE['constant']: [
+                    If(trigger_state == TRIG_STATE['off'], 
+                        trigger_state.eq(TRIG_STATE['init'])
+                    )
+                ]
 
             }).makedefault(TRIG_MODE['idle']),
-
+            
             If(self.trigger == 1,
                 # Skip if in constant trigger mode (where trigger duration is ignored)
                 If(self.mode != TRIG_MODE['constant'],                 
                     If(duration_counter == 0,                       
-                        self.trigger.eq(0)                          # Stop the trigger 
+                        self.trigger.eq(0),                         # Stop the trigger 
+                        trigger_state.eq(TRIG_STATE['off'])
                     ).Else(                             
                         duration_counter.eq(duration_counter - 1)   # Keep the trigger going
                     )
+                )
+            )
+        )
+
+        self.sync += [
+            If(trigger_state == TRIG_STATE['init'],
+                ## If a trigger has been entered (trigger_strobe == 2), check if there is a phase delay.
+                ## If not, directly go to trigger being started
+                ## If so, setup the phase count and enter the waiting state (trigger_strobe == 1)
+                If(self.phase == 0,
+                    self.trigger.eq(1),
+                    trigger_state.eq(TRIG_STATE['active'])
+                ).Else(
+                    phase_counter.eq(self.phase - 1),
+                    trigger_state.eq(TRIG_STATE['wait'])
+                )
+            )
+        ]
+
+        self.sync += If(strobe,
+            ## Trigger phase delay has been set and we're in that period.
+            ## Count down until the delay has been reached, then assert the trigger
+            If(trigger_state == TRIG_STATE['wait'],
+                If(phase_counter == 0,
+                    self.trigger.eq(1),
+                    trigger_state.eq(TRIG_STATE['active'])
+                ).Else(
+                    phase_counter.eq(phase_counter - 1),
                 )
             )
         )
@@ -119,12 +171,13 @@ class TriggerController(Module):
         reg_mode, _     = registers.create("Trigger Mode")
         reg_interval, _ = registers.create("Trigger Interval")
         reg_duration, _ = registers.create("Trigger Duration")
-        reg_mask, _     = registers.create("Trigger Mask")
+        reg_phase, _    = registers.create("Trigger Phase")
 
         self.comb += [
             self.trigger.mode.eq(reg_mode),
             self.trigger.interval.eq(reg_interval),
             self.trigger.duration.eq(reg_duration),
+            self.trigger.phase.eq(reg_phase),
         ]
 
         self.sync += [
