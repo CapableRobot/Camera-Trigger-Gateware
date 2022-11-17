@@ -26,7 +26,7 @@ import registers_patch
 
 
 from trigger import TriggerController, IdentRegisters, ResetController, ClockDivider
-
+from crossbar import CrossBarControl
 
 class TriggerTarget(Module):
     sys_clk_freq = 12e6
@@ -41,7 +41,8 @@ class TriggerTarget(Module):
             self.submodules.registers = registers_patch.apply(I2CRegisters(self.i2c_target.dut))
             self.submodules.wall = ClockDivider(5)
 
-            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, 8, [])
+            self.enable = Signal()
+            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, self.enable, 8)
 
         else:
             self.submodules.i2c_pads  = Pads(self.platform.request("i2c"))
@@ -63,10 +64,20 @@ class TriggerTarget(Module):
             triggers = [platform.request(name, num) for name,num in triggers]
 
             self.submodules.ident      = IdentRegisters(self.registers, self.product_id, self.hardware_revision, self.gateware_revision)
-            self.submodules.reset_ctrl = ResetController(self.registers, resets)
-            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, 8, triggers)
+            # self.submodules.reset_ctrl = ResetController(self.registers, resets)
 
-            self.enums["trigger_modes"] = self.trig_ctrl.modes
+            reg_globals, _  = self.registers.create("Trigger Globals")
+            enable = reg_globals[0]
+
+            self.submodules.triggerA  = TriggerController(0, self.registers, self.wall.strobe, enable, 8)
+            self.submodules.triggerB  = TriggerController(1, self.registers, self.wall.strobe, enable, 8)
+
+            inputs = Array([self.triggerA.output, self.triggerB.output])
+            
+
+            self.submodules.crossbar = CrossBarControl(self.registers, inputs, triggers, resets)
+
+            # self.enums["trigger_modes"] = self.trig_ctrl.modes
 
     @property
     def product_id(self):
@@ -85,8 +96,13 @@ def test_trigger_control(dut):
     ## Set mode to interval
     yield dut.registers.regs_r[0].eq(2)
 
+    ## Set phase
+    yield dut.registers.regs_r[3].eq(2)
+
     ## Set trigger interval & duration
     yield dut.registers.regs_r[1].eq(8)
+
+    yield dut.enable.eq(1)
 
     # Simulate waiting before setting duration 
     # (trigger should not start yet)
@@ -98,12 +114,25 @@ def test_trigger_control(dut):
     for i in range(100):
         yield
 
+    yield dut.enable.eq(0)
+
+    for i in range(20):
+        yield
+
+    yield dut.registers.regs_r[3].eq(4)
+    yield dut.enable.eq(1)
+
+    for i in range(100):
+        yield
+
     # Change the interval & duration values
     yield dut.registers.regs_r[1].eq(16)
     yield dut.registers.regs_r[2].eq(5)
 
-    for i in range(200):
+    for i in range(100):
         yield
+
+
 
 class SimpleTests():
 
