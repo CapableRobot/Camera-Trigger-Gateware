@@ -46,8 +46,7 @@ def create(self, name, length=1, default=0, ro=False, desc=''):
 
     if ro:
         if length == 1:
-            reg, addr  = self.add_ro(8)
-            self.comb += [reg.eq(default)]
+            reg, addr  = self.add_ro(8, reset=default)
 
         else:
             for idx in range(length):
@@ -61,10 +60,10 @@ def create(self, name, length=1, default=0, ro=False, desc=''):
 
     else:
         if length == 1:
-            reg, addr = self.add_rw(8)
+            reg, addr = self.add_rw(8, reset=default)
         else:
             for idx in range(length):
-                r, a = self.add_rw(8)
+                r, a = self.add_rw(8, reset=default)
                 reg.append(r)
                 addr.append(a)
     
