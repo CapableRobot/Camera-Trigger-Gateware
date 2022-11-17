@@ -25,7 +25,7 @@ from target_platform import TriggerPlatform
 import registers_patch
 
 
-from trigger import TriggerController, IdentRegisters, ResetController, ClockDivider
+from trigger import TriggerController, IdentRegisters, ClockDivider
 from crossbar import CrossBarControl
 
 class TriggerTarget(Module):
