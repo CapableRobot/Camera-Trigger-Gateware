@@ -110,7 +110,7 @@ class ResetController(Module):
 
 class TriggerController(Module):
 
-    def __init__(self, registers, strobe, width, trigger_pins):
+    def __init__(self, registers, strobe, width):
         self.submodules.trigger = Trigger(strobe, width)
 
         self.modes = TRIG_MODE
@@ -144,7 +144,5 @@ class TriggerController(Module):
             )
         ]
 
-        ## Apply mask between internal trigger signal and hardware pins
-        for i in range(len(trigger_pins)):
-            self.comb  += trigger_pins[i].eq(reg_mask[i] & self.trigger.trigger)
+        self.output = self.trigger.trigger
             
