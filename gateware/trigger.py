@@ -37,8 +37,7 @@ TRIG_MODE = dict(
     idle = 0x01,
     interval = 0x02,
     oneshot = 0x03,
-    constant = 0x04,
-    phasewait = 0xF0
+    constant = 0x04
 )
 
 TRIG_STATE = dict(
@@ -108,8 +107,11 @@ class Trigger(Module):
                     )
                 ]
 
-            }).makedefault(TRIG_MODE['idle']),
-            
+            }).makedefault(TRIG_MODE['idle'])
+        )
+
+        ## Count down the trigger duration once the trigger has been turned on
+        self.sync += If(strobe,    
             If(self.trigger == 1,
                 # Skip if in constant trigger mode (where trigger duration is ignored)
                 If(self.mode != TRIG_MODE['constant'],                 
@@ -123,6 +125,9 @@ class Trigger(Module):
             )
         )
 
+        ## This is outside of 'strobe' so that it runs ~immediately after the trigger is initiated 
+        ## (instead of waiting) for the next strobe edge.  This reduces latency when there is no
+        ## phase delay.
         self.sync += [
             If(trigger_state == TRIG_STATE['init'],
                 ## If a trigger has been entered (trigger_strobe == 2), check if there is a phase delay.
@@ -138,6 +143,7 @@ class Trigger(Module):
             )
         ]
 
+        ## Count down the trigger's phase delay, if one has been set
         self.sync += If(strobe,
             ## Trigger phase delay has been set and we're in that period.
             ## Count down until the delay has been reached, then assert the trigger
