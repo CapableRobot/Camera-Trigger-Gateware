@@ -64,7 +64,6 @@ class TriggerTarget(Module):
             triggers = [platform.request(name, num) for name,num in triggers]
 
             self.submodules.ident      = IdentRegisters(self.registers, self.product_id, self.hardware_revision, self.gateware_revision)
-            # self.submodules.reset_ctrl = ResetController(self.registers, resets)
 
             reg_globals, _  = self.registers.create("Trigger Globals")
             enable = reg_globals[0]

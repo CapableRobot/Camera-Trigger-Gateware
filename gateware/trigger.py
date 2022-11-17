@@ -164,15 +164,6 @@ class Trigger(Module):
             )
         )
 
-class ResetController(Module):
-
-    def __init__(self, registers, reset_pins):
-        assert len(reset_pins) == 8
-        register, _ = registers.create("Reset")
-
-        for i in range(len(reset_pins)):
-            self.comb  += reset_pins[i].eq(register[i])
-
 class TriggerController(Module):
 
     def __init__(self, idx, registers, strobe, enable, width):
