@@ -25,7 +25,7 @@ from target_platform import TriggerPlatform
 import registers_patch
 
 
-from trigger import TriggerController, IdentRegisters, ClockDivider
+from trigger import TriggerController, IdentRegisters, ClockDivider, Divider
 from crossbar import CrossBarControl
 
 class TriggerTarget(Module):
@@ -39,18 +39,16 @@ class TriggerTarget(Module):
         if platform == 'sim':
             self.submodules.i2c_target = I2CTargetTestbench()
             self.submodules.registers = registers_patch.apply(I2CRegisters(self.i2c_target.dut))
-            self.submodules.wall = ClockDivider(5)
+            self.submodules.tick = ClockDivider(2)
+            self.submodules.wall = Divider(self.tick.strobe, 2, 255)
 
             self.enable = Signal()
-            self.submodules.trig_ctrl  = TriggerController(self.registers, self.wall.strobe, self.enable)
+            self.submodules.trig_ctrl  = TriggerController(0, self.registers, self.wall.strobe, self.enable)
 
         else:
             self.submodules.i2c_pads  = Pads(self.platform.request("i2c"))
             self.submodules.i2c_target = I2CTarget(self.i2c_pads)
             self.submodules.registers = registers_patch.apply(I2CRegisters(self.i2c_target))
-
-            ## Create a 1 kHz clock (1 ms) from 12 MHz source, so that register settings are in ms increments
-            self.submodules.wall = ClockDivider(12000)
             
             ## Set I2C address 
             self.comb += self.i2c_target.address.eq(0b0001000)
@@ -65,7 +63,16 @@ class TriggerTarget(Module):
 
             self.submodules.ident      = IdentRegisters(self.registers, self.product_id, self.hardware_revision, self.gateware_revision)
 
-            reg_wall, _     = self.registers.create("Clock Dividder", default=100)
+            ## Create a 10 kHz clock (0.1 ms) from 12 MHz source
+            self.submodules.tick = ClockDivider(1200)
+
+            ## Create a adjustable divider on that 10 kHz clock.  
+            ## Default is 10, to create a 1 ms strobe for the trigger. 
+            reg_wall, _     = self.registers.create("Clock Divider", default=10)
+            self.submodules.wall = Divider(self.tick.strobe, 10, 255)
+            self.comb += [
+                self.wall.period.eq(reg_wall)
+            ]
 
             reg_globals, _  = self.registers.create("Trigger Globals")
             enable = reg_globals[0]

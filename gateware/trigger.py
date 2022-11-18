@@ -32,6 +32,28 @@ class ClockDivider(Module):
                             counter.eq(counter - 1),
                         )
 
+class Divider(Module):
+    def __init__(self, strobe, period, maxperiod):
+        counter = Signal(max=maxperiod)
+        self.period  = Signal(max=maxperiod, reset=period)
+
+        self.clock = Signal()
+        self.strobe = Signal()
+
+        self.sync += If(strobe,
+            If(counter == 0,
+                self.clock.eq(~self.clock),
+                self.strobe.eq(1),
+                counter.eq(self.period - 1),
+            ).Else(
+                counter.eq(counter - 1),
+            )
+        )
+
+        ## Strobe reset is outside of parent strobe so that our strobe
+        ## is 1 system clock long, instead of length of paree
+        self.sync += If(self.strobe, self.strobe.eq(0))
+
 TRIG_MODE = dict(
     stop = 0x00,
     idle = 0x01,
