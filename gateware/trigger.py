@@ -2,16 +2,23 @@ from migen import *
 
 class IdentRegisters(Module):
 
-    def __init__(self, registers, name, hardware_rev, gateware_rev, reserved=16):
+    def __init__(self, registers, name, hardware_rev, gateware_rev):
         self.name = name
         self.hardware_rev = hardware_rev
         self.gateware_rev = gateware_rev
-        self.reserved = reserved
 
         registers.create("Product ID", len(self.name), default=self.name, ro=True)
         registers.create("Hardware Revision", 1, default=self.hardware_rev, ro=True)
         registers.create("Gateware Revision", 1, default=self.gateware_rev, ro=True)
-        registers.create("Reserved", self.reserved-len(self.name)-2, default=0, ro=True)
+
+        cameras = dict(
+            CRZDGE=6,
+            CRFDJ1=6,
+            CRMHJN=5
+        )
+
+        registers.create("Camera Count", default=cameras[self.name], ro=True, addr=10)
+        registers.create("GPIO Count", default=4, ro=True)
 
 class ClockDivider(Module):
     def __init__(self, maxperiod):
@@ -188,16 +195,16 @@ class Trigger(Module):
 
 class TriggerController(Module):
 
-    def __init__(self, idx, registers, strobe, enable):
+    def __init__(self, idx, baseaddr, registers, strobe, enable):
         self.submodules.trigger = Trigger(strobe, enable)
 
         self.modes = TRIG_MODE
 
         ## TODO : support register widths != 8 bits
-        reg_mode, _     = registers.create("Trigger{} Mode".format(idx))
-        reg_interval, _ = registers.create("Trigger{} Interval".format(idx))
-        reg_duration, _ = registers.create("Trigger{} Duration".format(idx))
-        reg_phase, _    = registers.create("Trigger{} Phase".format(idx))
+        reg_mode, _     = registers.create("Trigger{} Mode".format(idx), addr=baseaddr)
+        reg_interval, _ = registers.create("Trigger{} Interval".format(idx), addr=baseaddr+1)
+        reg_duration, _ = registers.create("Trigger{} Duration".format(idx), addr=baseaddr+2)
+        reg_phase, _    = registers.create("Trigger{} Phase".format(idx), addr=baseaddr+3)
 
         self.comb += [
             self.trigger.mode.eq(reg_mode),

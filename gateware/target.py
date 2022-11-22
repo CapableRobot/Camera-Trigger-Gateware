@@ -30,6 +30,7 @@ from crossbar import CrossBarControl
 
 class TriggerTarget(Module):
     sys_clk_freq = 12e6
+    trigger_count = 4
 
     def __init__(self, platform=None):
         self.platform = platform
@@ -63,27 +64,30 @@ class TriggerTarget(Module):
 
             self.submodules.ident      = IdentRegisters(self.registers, self.product_id, self.hardware_revision, self.gateware_revision)
 
+            self.registers.create("Trigger Count", default=self.trigger_count, ro=True)
+
             ## Create a 10 kHz clock (0.1 ms) from 12 MHz source
             self.submodules.tick = ClockDivider(1200)
 
             ## Create a adjustable divider on that 10 kHz clock.  
             ## Default is 10, to create a 1 ms strobe for the trigger. 
-            reg_wall, _     = self.registers.create("Clock Divider", default=10)
+            reg_wall, _     = self.registers.create("Clock Divider", default=10, addr=20)
             self.submodules.wall = Divider(self.tick.strobe, 10, 255)
             self.comb += [
                 self.wall.period.eq(reg_wall)
             ]
 
-            reg_globals, _  = self.registers.create("Trigger Globals")
-            enable = reg_globals[0]
+            reg_enable, _  = self.registers.create("Trigger Enables", addr=60)
+            trigger_outputs = []
 
-            self.submodules.triggerA  = TriggerController(0, self.registers, self.wall.strobe, enable)
-            self.submodules.triggerB  = TriggerController(1, self.registers, self.wall.strobe, enable)
+            for num in range(self.trigger_count):
+                trigger = TriggerController(num, 64+(num*8), self.registers, self.wall.strobe, reg_enable[num])
 
-            inputs = Array([self.triggerA.output, self.triggerB.output])
-            
+                setattr(self.submodules, "trigger{}".format(chr(0x41+num)), trigger)
+                trigger_outputs.append(trigger.output)
 
-            self.submodules.crossbar = CrossBarControl(self.registers, inputs, triggers, resets)
+            inputs = Array(trigger_outputs)
+            self.submodules.crossbar = CrossBarControl(32, self.registers, inputs, triggers, resets)
 
             # self.enums["trigger_modes"] = self.trig_ctrl.modes
 
@@ -97,7 +101,7 @@ class TriggerTarget(Module):
 
     @property
     def gateware_revision(self):
-        return 0
+        return 1
 
 def test_trigger_control(dut):
     

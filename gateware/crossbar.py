@@ -58,7 +58,7 @@ class CrossBar(Module):
 
 class CrossBarControl(Module):
 
-    def __init__(self, registers, inputs, bank_a, bank_b):
+    def __init__(self, baseaddr, registers, inputs, bank_a, bank_b):
 
         a_count = len(bank_a)
         b_count = len(bank_b)
@@ -67,13 +67,13 @@ class CrossBarControl(Module):
         self.submodules.crossbar = CrossBar(inputs, outputs)
 
         for i in range(a_count):
-            ctrl, _ = registers.create("Crossbar A{}".format(i), default=0b0100_0000)
+            ctrl, _ = registers.create("Crossbar A{}".format(i), addr=baseaddr+i, default=0b0100_0000)
 
             self.comb += self.crossbar.controls[i].eq(ctrl),
             self.comb += bank_a[i].eq(outputs[i])
         
         for i in range(b_count):
-            ctrl, _ = registers.create("Crossbar B{}".format(i), default=0b0100_0000)
+            ctrl, _ = registers.create("Crossbar B{}".format(i), addr=baseaddr+i+a_count, default=0b0100_0000)
 
             self.comb += self.crossbar.controls[i + a_count].eq(ctrl),
             self.comb += bank_b[i].eq(outputs[i + a_count])
