@@ -21,20 +21,56 @@ name               addr      length  default    ro
 -----------------  ------  --------  ---------  -----
 Product ID         0x00           6  CRZDGE     True
 Hardware Revision  0x06           1  0          True
-Gateware Revision  0x07           1  0          True
-Reserved           0x08           8  0          True
-Reset Mask         0x10           1  0          False
-Trigger Mode       0x11           1  0          False
-Trigger Interval   0x12           1  0          False
-Trigger Duration   0x13           1  0          False
-Trigger Mask       0x14           1  0          False
+Gateware Revision  0x07           1  1          True
+Camera Count       0x0A           1  6          True
+GPIO Count         0x0B           1  4          True
+Trigger Count      0x0C           1  4          True
+
+Clock Divider      0x14           1  10         False
+Power Control      0x15           1  1          False
+
+Crossbar A0        0x20           1  64         False
+Crossbar A1        0x21           1  64         False
+Crossbar A2        0x22           1  64         False
+Crossbar A3        0x23           1  64         False
+Crossbar A4        0x24           1  64         False
+Crossbar A5        0x25           1  64         False
+Crossbar A6        0x26           1  64         False
+Crossbar A7        0x27           1  64         False
+Crossbar B0        0x28           1  64         False
+Crossbar B1        0x29           1  64         False
+Crossbar B2        0x2A           1  64         False
+Crossbar B3        0x2B           1  64         False
+Crossbar B4        0x2C           1  64         False
+Crossbar B5        0x2D           1  64         False
+Crossbar B6        0x2E           1  64         False
+Crossbar B7        0x2F           1  64         False
+
+Trigger Enables    0x3C           1  0          False
+
+Trigger0 Mode      0x40           1  0          False
+Trigger0 Interval  0x41           1  0          False
+Trigger0 Duration  0x42           1  0          False
+Trigger0 Phase     0x43           1  0          False
+Trigger1 Mode      0x48           1  0          False
+Trigger1 Interval  0x49           1  0          False
+Trigger1 Duration  0x4A           1  0          False
+Trigger1 Phase     0x4B           1  0          False
+Trigger2 Mode      0x50           1  0          False
+Trigger2 Interval  0x51           1  0          False
+Trigger2 Duration  0x52           1  0          False
+Trigger2 Phase     0x53           1  0          False
+Trigger3 Mode      0x58           1  0          False
+Trigger3 Interval  0x59           1  0          False
+Trigger3 Duration  0x5A           1  0          False
+Trigger3 Phase     0x5B           1  0          False
 ```
 
 ### Toolchain Installation
 
 Install the [open-source FPGA toolchain](https://github.com/YosysHQ/fpga-toolchain).  
 
-Then install [nmigen](https://github.com/nmigen/nmigen) and [tabulate](https://github.com/astanin/python-tabulate) via PIP:
+Then install [nmigen](https://github.com/migen/migen) and [tabulate](https://github.com/astanin/python-tabulate) via PIP:
 
 ```
 pip install -r requirements.txt

@@ -1,2 +1,2 @@
-git+https://github.com/nmigen/nmigen.git#egg=nmigen
+migen
 tabulate
