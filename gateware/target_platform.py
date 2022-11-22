@@ -38,6 +38,9 @@ class TriggerPlatform(LatticePlatform):
         ("aux", 2, Pins("20"), IOStandard("LVCMOS33")),
         ("aux", 3, Pins("21"), IOStandard("LVCMOS33")),
 
+        ("camera_power", 0, Pins("13"), IOStandard("LVCMOS33")),
+        ("camera_power_3v3", 0, Pins("13"), IOStandard("LVCMOS33")),
+
         ("csi_rst", 0, Pins("34"), IOStandard("LVCMOS33")),
         ("csi_rst", 1, Pins("38"), IOStandard("LVCMOS33")),
         ("csi_rst", 2, Pins("43"), IOStandard("LVCMOS33")),

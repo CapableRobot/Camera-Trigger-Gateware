@@ -77,6 +77,13 @@ class TriggerTarget(Module):
                 self.wall.period.eq(reg_wall)
             ]
 
+            reg_power, _  = self.registers.create("Power Control", default=0x01, addr=21)            
+            camera_power = platform.request("camera_power", 0)
+
+            self.comb += [
+                camera_power.eq(reg_power[0])
+            ]
+
             reg_enable, _  = self.registers.create("Trigger Enables", addr=60)
             trigger_outputs = []
 
