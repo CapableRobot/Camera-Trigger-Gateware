@@ -13,26 +13,54 @@ class Registers(Module):
     """
     def __init__(self):
         self.reg_count = 0
+        self.last_addr = -1
+        self.addresses = []
+
         self.regs_r = Array()
         self.regs_w = Array()
 
+        self._regs_r = dict()
+        self._regs_w = dict()
+
     def _add_reg(self, *args, **kwargs):
+        if 'addr' in kwargs.keys():
+            addr = kwargs.pop('addr')
+        else:
+            addr = self.last_addr + 1
+
+        if addr in self.addresses:
+            return None, addr
+        
+        self.addresses.append(addr)
+
+        self.last_addr = addr
+        self.reg_count = max(self.addresses) + 1
+
         reg  = Signal(*args, **kwargs)
-        addr = self.reg_count
-        self.reg_count += 1
+
         return reg, addr
 
     def add_ro(self, *args, **kwargs):
         reg, addr = self._add_reg(*args, **kwargs)
-        self.regs_r.append(reg)
-        self.regs_w.append(Signal(name="ro_reg_dummy"))
+        self._regs_r[addr] = reg
+        self._regs_w[addr] = Signal(name="ro_reg_dummy")
         return reg, addr
 
     def add_rw(self, *args, **kwargs):
         reg, addr = self._add_reg(*args, **kwargs)
-        self.regs_r.append(reg)
-        self.regs_w.append(reg)
+        self._regs_r[addr] = reg
+        self._regs_w[addr] = reg
         return reg, addr
+
+    def do_finalize(self):
+        for idx in range(self.reg_count):
+            if idx in self.addresses:
+                self.regs_r.append(self._regs_r[idx])
+                self.regs_w.append(self._regs_w[idx])
+            else:
+                self.regs_r.append(Signal(name="ro_reg_dummy"))
+                self.regs_w.append(Signal(name="ro_reg_dummy"))
+
 
 
 class I2CRegisters(Registers):
@@ -47,6 +75,8 @@ class I2CRegisters(Registers):
         self.i2c_target = i2c_target
 
     def do_finalize(self):
+        super().do_finalize()
+
         if self.reg_count == 0:
             return
 

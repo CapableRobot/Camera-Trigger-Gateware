@@ -27,26 +27,15 @@ def apply(obj):
 def _hex(value):
     return "0x" + format(value, '02X')
 
-def create(self, name, length=1, default=0, ro=False, desc=''):
+def create(self, name, length=1, default=0, ro=False, desc='', **kwargs):
     if not hasattr(self, 'registers'):
         self.registers = []
 
-    self.registers.append(
-        dict(
-            name=name, 
-            length=length, 
-            addr=self.reg_count, 
-            default=default, 
-            ro=ro, 
-            desc=desc
-        )
-    )
-
     reg, addr = [], []
-
+    
     if ro:
         if length == 1:
-            reg, addr  = self.add_ro(8, reset=default)
+            reg, addr  = self.add_ro(8, reset=default, **kwargs)
 
         else:
             for idx in range(length):
@@ -54,18 +43,40 @@ def create(self, name, length=1, default=0, ro=False, desc=''):
                 if default != 0:
                     value = ord(default[idx])
 
-                r, a = self.add_ro(8, reset=value)
+                r, a = self.add_ro(8, reset=value, **kwargs)
                 reg.append(r)
                 addr.append(a)
 
     else:
         if length == 1:
-            reg, addr = self.add_rw(8, reset=default)
+            reg, addr = self.add_rw(8, reset=default, **kwargs)
         else:
             for idx in range(length):
-                r, a = self.add_rw(8, reset=default)
+                r, a = self.add_rw(8, reset=default, **kwargs)
                 reg.append(r)
                 addr.append(a)
+
+    if type(addr) is list:
+        baseaddr = addr[0]
+    else:
+        baseaddr = addr
+
+    if reg is None or len(reg) == 0:
+        print("Cannot add a register '{}' at address {} ({}) as one exists".format(name, baseaddr, hex(baseaddr)))
+        print()
+        self.display_table()
+        raise ValueError
+
+    self.registers.append(
+        dict(
+            name=name, 
+            length=length, 
+            addr=baseaddr, 
+            default=default, 
+            ro=ro, 
+            desc=desc
+        )
+    )
     
     return reg, addr
 
@@ -73,8 +84,8 @@ def display_table(self):
     headers = ["name", "addr", "length", "default", "ro"]
     table = []
 
-    for reg in self.registers:
-        reg['addr'] = _hex(reg['addr'])
+    for reg in sorted(self.registers, key=lambda e: e['addr']):
+        # reg['addr'] = _hex(reg['addr'])
         row = [reg[key] for key in headers]
 
         table.append(row)
