@@ -85,7 +85,7 @@ def display_table(self):
     table = []
 
     for reg in sorted(self.registers, key=lambda e: e['addr']):
-        # reg['addr'] = _hex(reg['addr'])
+        reg['addr'] = _hex(reg['addr'])
         row = [reg[key] for key in headers]
 
         table.append(row)
