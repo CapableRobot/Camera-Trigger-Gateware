@@ -204,7 +204,7 @@ class TriggerController(Module):
         reg_mode, _     = registers.create("Trigger{} Mode".format(idx), addr=baseaddr)
         reg_interval, _ = registers.create("Trigger{} Interval".format(idx), addr=baseaddr+1)
         reg_duration, _ = registers.create("Trigger{} Duration".format(idx), addr=baseaddr+2)
-        reg_phase, _    = registers.create("Trigger{} Phase".format(idx), addr=baseaddr+3)
+        reg_phase, _    = registers.create("Trigger{} Delay".format(idx), addr=baseaddr+3)
 
         self.comb += [
             self.trigger.mode.eq(reg_mode),
