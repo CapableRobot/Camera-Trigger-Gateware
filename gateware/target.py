@@ -77,11 +77,22 @@ class TriggerTarget(Module):
                 self.wall.period.eq(reg_wall)
             ]
 
-            reg_power, _  = self.registers.create("Power Control", default=0x01, addr=21)            
-            camera_power = platform.request("camera_power", 0)
+            reg_power, _  = self.registers.create("Power Control", default=0x03, addr=21)
+            reg_sense, _  = self.registers.create("Power Sense", default=0x00, addr=22, ro=True) 
+
+            camera_power_3v3 = platform.request("camera_power_3v3", 0)
+            camera_power_5v0 = platform.request("camera_power_5v0", 0)
+
+            camera_sense_3v3 = platform.request("camera_sense_3v3", 0)
+            camera_sense_5v0 = platform.request("camera_sense_5v0", 0)
 
             self.comb += [
-                camera_power.eq(reg_power[0])
+                camera_power_3v3.eq(reg_power[0]),
+                camera_power_5v0.eq(reg_power[1])
+            ]
+
+            self.comb += [
+                reg_sense.eq(Cat(camera_sense_3v3, camera_sense_5v0))
             ]
 
             reg_enable, _  = self.registers.create("Trigger Enables", addr=60)
@@ -96,15 +107,13 @@ class TriggerTarget(Module):
             inputs = Array(trigger_outputs)
             self.submodules.crossbar = CrossBarControl(32, self.registers, inputs, triggers, resets)
 
-            # self.enums["trigger_modes"] = self.trig_ctrl.modes
-
     @property
     def product_id(self):
-        return "CRZDGE"
+        return "CRFDJ1"
 
     @property
     def hardware_revision(self):
-        return 0
+        return 10
 
     @property
     def gateware_revision(self):
